@@ -2,11 +2,12 @@
 <html lang="uk" data-theme="light">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>М'ЯСНИК – Аналітика (Supabase)</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    /* Стилі – скорочено, але вони забезпечують повний дизайн */
+    /* Стилі – скорочено */
     :root {
       --primary: #dc2626; --primary-hover: #b91c1c; --secondary: #3b82f6;
       --bg-main: #f1f5f9; --bg-card: #ffffff; --text-main: #0f172a; --text-muted: #64748b; --border-light: #e2e8f0;
@@ -61,7 +62,6 @@
 
   <div class="toast-container" id="toastContainer"></div>
 
-  <!-- Вкладки -->
   <div id="view-sellers" class="view-container active">
     <div class="filter-card">
       <button class="btn" onclick="loadSellers()">Завантажити звіт</button>
@@ -117,7 +117,6 @@
       'sb_publishable_HAnGqHn_9wM_1T78evD-AQ_JRGeLBLo'
     );
 
-    // ========== Допоміжні функції ==========
     function showToast(msg, type = 'info') {
       const c = document.getElementById('toastContainer');
       const t = document.createElement('div');
@@ -130,11 +129,14 @@
     function switchTab(name) {
       document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.view-container').forEach(v => v.classList.remove('active'));
-      document.querySelector(`.tab:nth-child(${['sellers','operators','log','add','help'].indexOf(name)+1})`).classList.add('active');
+      const tabs = ['sellers','operators','log','add','help'];
+      document.querySelector(`.tab:nth-child(${tabs.indexOf(name)+1})`).classList.add('active');
       document.getElementById(`view-${name}`).classList.add('active');
+      if (name === 'sellers') loadSellers();
+      else if (name === 'operators') loadOperators();
+      else if (name === 'log') loadLog();
     }
 
-    // Класифікація порушення (за текстом категорії та опису)
     function classifyViolation(cat, desc) {
       const t = (cat + ' ' + (desc || '')).toLowerCase();
       if (t.includes('камер') || t.includes('спиртн') || t.includes('надкритич')) return { pts: 20, isCrit: true, isSuper: true };
@@ -147,21 +149,19 @@
       return { pts: 1, isCrit: false, isSuper: false };
     }
 
-    // ========== Звіт продавців ==========
     async function loadSellers() {
-      const { data, error } = await supabase.from('violations').select('*').order('Дата', { ascending: false });
+      const { data, error } = await supabase.from('violations').select('*').order('"Дата"', { ascending: false });
       if (error) return showToast(error.message, 'error');
       const sellers = {};
       data.forEach(v => {
         const seller = (v["Продавец ФІО"] || '').trim().toUpperCase();
         if (!seller) return;
         const cls = classifyViolation(v["Категорія"], v["Порушення"]);
-        if (!sellers[seller]) sellers[seller] = { name: seller, count: 0, crit: 0, superCrit: 0, shops: {}, types: {} };
+        if (!sellers[seller]) sellers[seller] = { name: seller, count: 0, crit: 0, superCrit: 0, shops: {} };
         sellers[seller].count++;
         if (cls.isCrit) sellers[seller].crit++;
         if (cls.isSuper) sellers[seller].superCrit++;
         sellers[seller].shops[v["Магазин"]] = true;
-        sellers[seller].types[v["Категорія"]] = (sellers[seller].types[v["Категорія"]] || 0) + 1;
       });
       const list = Object.values(sellers).sort((a,b) => b.superCrit - a.superCrit || b.crit - a.crit);
       let html = '<table><tr><th>Продавець</th><th>Порушень</th><th>Критичні</th><th>Магазини</th></tr>';
@@ -178,7 +178,6 @@
       showToast('Звіт завантажено', 'success');
     }
 
-    // ========== KPI операторів ==========
     async function loadOperators() {
       const { data, error } = await supabase.from('violations').select('*');
       if (error) return showToast(error.message, 'error');
@@ -201,11 +200,10 @@
       showToast('KPI розраховано', 'success');
     }
 
-    // ========== Журнал ==========
     async function loadLog() {
-      const { data, error } = await supabase.from('violations').select('*').order('Дата', { ascending: false });
+      const { data, error } = await supabase.from('violations').select('*').order('"Дата"', { ascending: false });
       if (error) return showToast(error.message, 'error');
-      let html = '<table><tr><th>Дата</th><th>Магазин</th><th>Оператор</th><th>Продавець</th><th>Категорія</th><th>Опис</th></tr>';
+      let html = '<table><tr><th>Дата</th><th>Магазин</th><th>Оператор</th><th>Продавець</th><th>Категорія</th></tr>';
       data.forEach(v => {
         html += `<tr>
           <td>${v["Дата"] || ''}</td>
@@ -213,7 +211,6 @@
           <td>${v["Оператор"] || ''}</td>
           <td>${v["Продавец ФІО"] || ''}</td>
           <td>${v["Категорія"] || ''}</td>
-          <td>${(v["Порушення"] || '').substring(0, 50)}</td>
         </tr>`;
       });
       html += '</table>';
@@ -221,7 +218,6 @@
       showToast('Журнал завантажено', 'success');
     }
 
-    // ========== Фіксація порушення ==========
     async function submitViolation(e) {
       e.preventDefault();
       const btn = e.target.querySelector('button');
@@ -247,8 +243,8 @@
       }
     }
 
-    // Встановлюємо сьогоднішню дату за замовчуванням у формі
     document.getElementById('date').value = new Date().toISOString().split('T')[0];
+    loadSellers();
   </script>
 </body>
 </html>
