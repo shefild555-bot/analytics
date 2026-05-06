@@ -2,12 +2,12 @@
 <html lang="uk" data-theme="light">
 <head>
   <meta charset="UTF-8">
+  <!-- РАЗРЕШАЕМ unsafe-eval ДЛЯ БИБЛИОТЕК -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>М'ЯСНИК – Аналітика (Supabase)</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    /* Стилі – скорочено */
     :root {
       --primary: #dc2626; --primary-hover: #b91c1c; --secondary: #3b82f6;
       --bg-main: #f1f5f9; --bg-card: #ffffff; --text-main: #0f172a; --text-muted: #64748b; --border-light: #e2e8f0;
@@ -111,7 +111,7 @@
   </div>
 
   <script>
-    // ========== Підключення Supabase ==========
+    // Supabase
     const supabase = window.supabase.createClient(
       'https://bnipewkczbqcravhptkn.supabase.com',
       'sb_publishable_HAnGqHn_9wM_1T78evD-AQ_JRGeLBLo'
