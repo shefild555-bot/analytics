@@ -1,247 +1,572 @@
 <!DOCTYPE html>
 <html lang="uk" data-theme="light">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>М'ЯСНИК – Аналітика (Supabase)</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <style>
-    :root {
-      --primary: #dc2626; --primary-hover: #b91c1c; --secondary: #3b82f6;
-      --bg-main: #f1f5f9; --bg-card: #ffffff; --text-main: #0f172a; --text-muted: #64748b; --border-light: #e2e8f0;
-      --danger-bg: #fee2e2; --danger-text: #991b1b; --warning-bg: #fef3c7; --warning-text: #92400e;
-      --success-bg: #dcfce7; --success-text: #166534; --info-bg: #e0f2fe; --info-text: #075985;
-      --shadow-sm: 0 1px 2px rgba(0,0,0,0.05); --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
-      --radius-sm: 12px; --radius-md: 16px; --radius-lg: 20px; --radius-xl: 24px;
-    }
-    [data-theme="dark"] {
-      --bg-main: #0f172a; --bg-card: #1e293b; --text-main: #f1f5f9; --text-muted: #94a3b8; --border-light: #334155;
-    }
-    * { transition: background-color 0.3s, color 0.3s; }
-    body { font-family: 'Inter', sans-serif; background: var(--bg-main); color: var(--text-main); margin: 0; padding: 0; }
-    .app-header { background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); padding: 20px; text-align: center; border-bottom: 3px solid #ef4444; }
-    [data-theme="dark"] .app-header { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
-    .app-header h1 { font-size: 26px; font-weight: 900; background: linear-gradient(135deg, #dc2626, #f87171); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .tabs { display: flex; background: var(--bg-card); padding: 6px; border-radius: var(--radius-lg); max-width: 900px; margin: 20px auto; box-shadow: var(--shadow-md); }
-    .tab { padding: 10px 18px; font-weight: 600; color: var(--text-muted); border-radius: 14px; cursor: pointer; }
-    .tab.active { background: var(--primary); color: white; }
-    .view-container { display: none; padding: 20px; }
-    .view-container.active { display: block; }
-    .filter-card { background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); margin-bottom: 20px; }
-    .btn { padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: var(--radius-sm); cursor: pointer; font-weight: 700; }
-    .btn-sm { padding: 6px 12px; font-size: 12px; background: var(--bg-main); color: var(--text-main); border: 1px solid var(--border-light); border-radius: 20px; cursor: pointer; margin: 2px; }
-    .btn-sm.active { background: var(--primary); color: white; }
-    table { width: 100%; border-collapse: collapse; background: var(--bg-card); margin-top: 10px; }
-    th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border-light); }
-    th { background: #f8fafc; font-weight: 700; color: var(--text-muted); }
-    .badge { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; display: inline-block; }
-    .badge-neutral { background: #f1f5f9; color: #475569; }
-    .badge-danger { background: #fee2e2; color: #991b1b; }
-    .badge-warning { background: #fef3c7; color: #92400e; }
-    .badge-success { background: #dcfce7; color: #166534; }
-    .toast-container { position: fixed; bottom: 16px; right: 16px; z-index: 4000; display: flex; flex-direction: column; gap: 8px; }
-    .toast { padding: 12px 20px; border-radius: var(--radius-sm); color: white; font-weight: 600; font-size: 13px; box-shadow: var(--shadow-md); }
-    .toast.success { background: #10b981; } .toast.error { background: #ef4444; } .toast.info { background: #3b82f6; }
-  </style>
-</head>
-<body>
-  <header class="app-header">
-    <h1>Система аналітики та контролю ефективності</h1>
-    <div>Моніторинг порушень та KPI (Supabase)</div>
-  </header>
-
-  <div class="tabs">
-    <div class="tab active" onclick="switchTab('sellers')">👥 Звіт продавців</div>
-    <div class="tab" onclick="switchTab('operators')">📈 Ефективність</div>
-    <div class="tab" onclick="switchTab('log')">📑 Журнал</div>
-    <div class="tab" onclick="switchTab('add')">✍️ Фіксація</div>
-    <div class="tab" onclick="switchTab('help')">💡 Довідка</div>
-  </div>
-
-  <div class="toast-container" id="toastContainer"></div>
-
-  <div id="view-sellers" class="view-container active">
-    <div class="filter-card">
-      <button class="btn" onclick="loadSellers()">Завантажити звіт</button>
-    </div>
-    <div id="sellersTable"></div>
-  </div>
-
-  <div id="view-operators" class="view-container">
-    <div class="filter-card"><button class="btn" onclick="loadOperators()">Розрахувати KPI</button></div>
-    <div id="operatorsTable"></div>
-  </div>
-
-  <div id="view-log" class="view-container">
-    <div class="filter-card"><button class="btn" onclick="loadLog()">Відкрити журнал</button></div>
-    <div id="logTable"></div>
-  </div>
-
-  <div id="view-add" class="view-container">
-    <div class="filter-card">
-      <h3>Реєстрація порушення</h3>
-      <form id="violationForm" onsubmit="submitViolation(event)">
-        <input type="text" id="shop" placeholder="Магазин" required><br><br>
-        <input type="text" id="admin" placeholder="Адміністратор"><br><br>
-        <input type="text" id="operator" placeholder="Оператор" required><br><br>
-        <input type="text" id="seller" placeholder="Продавець" required><br><br>
-        <input type="date" id="date" required><br><br>
-        <input type="time" id="time"><br><br>
-        <input type="text" id="category" placeholder="Категорія" required><br><br>
-        <textarea id="description" placeholder="Опис" required></textarea><br><br>
-        <button type="submit" class="btn">Зберегти</button>
-      </form>
-    </div>
-  </div>
-
-  <div id="view-help" class="view-container">
-    <div class="filter-card">
-      <h3>Вага порушень</h3>
-      <table>
-        <tr><th>Група</th><th>Бали</th><th>Типи</th></tr>
-        <tr><td><span class="badge badge-danger">Надкритичні</span></td><td>20</td><td>Камери, спиртне</td></tr>
-        <tr><td><span class="badge badge-danger">Критичні</span></td><td>10</td><td>Махінації</td></tr>
-        <tr><td><span class="badge badge-warning">Операційні</span></td><td>5</td><td>Пересорт, обрахунок...</td></tr>
-        <tr><td><span class="badge badge-neutral">Дрібні</span></td><td>1</td><td>Рукавички, телефон...</td></tr>
-        <tr><td><span class="badge badge-success">Бонусні</span></td><td>10/5</td><td>Службове завдання, турбота</td></tr>
-      </table>
-    </div>
-  </div>
-
-  <script>
-    const supabase = window.supabase.createClient(
-      'https://bnipewkczbqcravhptkn.supabase.com',
-      'sb_publishable_HAnGqHn_9wM_1T78evD-AQ_JRGeLBLo'
-    );
-
-    function showToast(msg, type = 'info') {
-      const c = document.getElementById('toastContainer');
-      const t = document.createElement('div');
-      t.className = `toast ${type}`;
-      t.textContent = msg;
-      c.appendChild(t);
-      setTimeout(() => t.remove(), 3000);
-    }
-
-    function switchTab(name) {
-      document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
-      document.querySelectorAll('.view-container').forEach(v => v.classList.remove('active'));
-      const tabs = ['sellers','operators','log','add','help'];
-      document.querySelector(`.tab:nth-child(${tabs.indexOf(name)+1})`).classList.add('active');
-      document.getElementById(`view-${name}`).classList.add('active');
-      if (name === 'sellers') loadSellers();
-      else if (name === 'operators') loadOperators();
-      else if (name === 'log') loadLog();
-    }
-
-    function classifyViolation(cat, desc) {
-      const t = (cat + ' ' + (desc || '')).toLowerCase();
-      if (t.includes('камер') || t.includes('спиртн') || t.includes('надкритич')) return { pts: 20, isCrit: true, isSuper: true };
-      if (t.includes('службов') || t.includes('бонус')) return { pts: 10, isCrit: false, isSuper: false };
-      if (t.includes('турбот')) return { pts: 5, isCrit: false, isSuper: false };
-      if (t.includes('рукавич') || t.includes('пустот') || t.includes('телефон') || t.includes('зовнішн') || t.includes('обслуговуван')) return { pts: 1, isCrit: false, isSuper: false };
-      if (t.includes('видален') || t.includes('виніс') || t.includes('привласнен') || t.includes('махінац') || t.includes('повз касу') || t.includes('протермінован') || t.includes('маніпуляці')) return { pts: 10, isCrit: true, isSuper: false };
-      if (t.includes('пересорт') || t.includes('обрахунок') || t.includes('касов') || t.includes('сейф') || t.includes('санітар') || t.includes('переоцін') || t.includes('відкриття') || t.includes('закриття') || t.includes('збільшен') || t.includes('ваг')) return { pts: 5, isCrit: false, isSuper: false };
-      if (t.includes('графік') || t.includes('куріння') || t.includes('лексик') || t.includes('раннє')) return { pts: 3, isCrit: false, isSuper: false };
-      return { pts: 1, isCrit: false, isSuper: false };
-    }
-
-    async function loadSellers() {
-      const { data, error } = await supabase.from('violations').select('*').order('"Дата"', { ascending: false });
-      if (error) return showToast(error.message, 'error');
-      const sellers = {};
-      data.forEach(v => {
-        const seller = (v["Продавец ФІО"] || '').trim().toUpperCase();
-        if (!seller) return;
-        const cls = classifyViolation(v["Категорія"], v["Порушення"]);
-        if (!sellers[seller]) sellers[seller] = { name: seller, count: 0, crit: 0, superCrit: 0, shops: {} };
-        sellers[seller].count++;
-        if (cls.isCrit) sellers[seller].crit++;
-        if (cls.isSuper) sellers[seller].superCrit++;
-        sellers[seller].shops[v["Магазин"]] = true;
-      });
-      const list = Object.values(sellers).sort((a,b) => b.superCrit - a.superCrit || b.crit - a.crit);
-      let html = '<table><tr><th>Продавець</th><th>Порушень</th><th>Критичні</th><th>Магазини</th></tr>';
-      list.forEach(r => {
-        html += `<tr>
-          <td>${r.name}</td>
-          <td>${r.count}</td>
-          <td><span class="badge ${r.crit ? 'badge-danger' : 'badge-neutral'}">${r.crit}</span></td>
-          <td>${Object.keys(r.shops).join(', ')}</td>
-        </tr>`;
-      });
-      html += '</table>';
-      document.getElementById('sellersTable').innerHTML = html;
-      showToast('Звіт завантажено', 'success');
-    }
-
-    async function loadOperators() {
-      const { data, error } = await supabase.from('violations').select('*');
-      if (error) return showToast(error.message, 'error');
-      const ops = {};
-      data.forEach(v => {
-        const op = (v["Оператор"] || '').trim();
-        if (!op) return;
-        const cls = classifyViolation(v["Категорія"], v["Порушення"]);
-        if (!ops[op]) ops[op] = { name: op, sum: 0, count: 0 };
-        ops[op].sum += cls.pts;
-        ops[op].count++;
-      });
-      const list = Object.values(ops).sort((a,b) => b.sum - a.sum);
-      let html = '<table><tr><th>Оператор</th><th>Бали</th><th>Порушень</th></tr>';
-      list.forEach(r => {
-        html += `<tr><td>${r.name}</td><td>${r.sum}</td><td>${r.count}</td></tr>`;
-      });
-      html += '</table>';
-      document.getElementById('operatorsTable').innerHTML = html;
-      showToast('KPI розраховано', 'success');
-    }
-
-    async function loadLog() {
-      const { data, error } = await supabase.from('violations').select('*').order('"Дата"', { ascending: false });
-      if (error) return showToast(error.message, 'error');
-      let html = '<table><tr><th>Дата</th><th>Магазин</th><th>Оператор</th><th>Продавець</th><th>Категорія</th></tr>';
-      data.forEach(v => {
-        html += `<tr>
-          <td>${v["Дата"] || ''}</td>
-          <td>${v["Магазин"] || ''}</td>
-          <td>${v["Оператор"] || ''}</td>
-          <td>${v["Продавец ФІО"] || ''}</td>
-          <td>${v["Категорія"] || ''}</td>
-        </tr>`;
-      });
-      html += '</table>';
-      document.getElementById('logTable').innerHTML = html;
-      showToast('Журнал завантажено', 'success');
-    }
-
-    async function submitViolation(e) {
-      e.preventDefault();
-      const btn = e.target.querySelector('button');
-      btn.disabled = true;
-      btn.textContent = 'Збереження...';
-      const { error } = await supabase.from('violations').insert([{
-        "Магазин": document.getElementById('shop').value,
-        "Адмін ФИО": document.getElementById('admin').value,
-        "Оператор": document.getElementById('operator').value,
-        "Продавец ФІО": document.getElementById('seller').value,
-        "Дата": document.getElementById('date').value,
-        "Час": document.getElementById('time').value || null,
-        "Категорія": document.getElementById('category').value,
-        "Порушення": document.getElementById('description').value
-      }]);
-      btn.disabled = false;
-      btn.textContent = 'Зберегти';
-      if (error) {
-        showToast(error.message, 'error');
-      } else {
-        showToast('Порушення зафіксовано!', 'success');
-        document.getElementById('violationForm').reset();
+  <head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- Разрешить unsafe-eval для работы Supabase-клиента -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline';">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <!-- Подключаем Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+      /* Все ваши стили (оставлены полностью) */
+      :root {
+        --primary: #dc2626; --primary-hover: #b91c1c; --secondary: #3b82f6; 
+        --bg-main: #f1f5f9; --bg-card: #ffffff; --text-main: #0f172a; --text-muted: #64748b; --border-light: #e2e8f0;
+        --danger-bg: #fee2e2; --danger-text: #991b1b; --warning-bg: #fef3c7; --warning-text: #92400e;
+        --success-bg: #dcfce7; --success-text: #166534; --info-bg: #e0f2fe; --info-text: #075985;
+        --shadow-sm: 0 1px 2px rgba(0,0,0,0.05); --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+        --shadow-lg: 0 10px 40px -10px rgba(0,0,0,0.06); --shadow-xl: 0 25px 50px -12px rgba(0,0,0,0.25);
+        --radius-sm: 12px; --radius-md: 16px; --radius-lg: 20px; --radius-xl: 24px; --radius-2xl: 30px;
+        --font-table: 15px; --font-name: 17px; --font-badge: 12px; --font-header: 12px;
       }
-    }
 
-    document.getElementById('date').value = new Date().toISOString().split('T')[0];
-    loadSellers();
-  </script>
-</body>
+      [data-theme="dark"] {
+        --bg-main: #0f172a; --bg-card: #1e293b; --text-main: #f1f5f9; --text-muted: #94a3b8; --border-light: #334155;
+        --shadow-sm: 0 1px 2px rgba(0,0,0,0.3); --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4);
+        --shadow-lg: 0 10px 40px -10px rgba(0,0,0,0.4); --shadow-xl: 0 25px 50px -12px rgba(0,0,0,0.5);
+      }
+      [data-theme="dark"] .app-header { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important; border-bottom-color: #ef4444 !important; }
+      [data-theme="dark"] .app-header .subtitle { color: #94a3b8 !important; }
+      [data-theme="dark"] table { background: #1e293b; } [data-theme="dark"] th { background: #334155; }
+      [data-theme="dark"] td { color: #e2e8f0; border-bottom-color: #334155; } [data-theme="dark"] tbody tr:hover { background: #334155; }
+      [data-theme="dark"] .btn-sm { background: #334155; color: #e2e8f0; border-color: #475569; }
+      [data-theme="dark"] .btn-sm:hover { background: #475569; }
+      [data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea { background: #334155; color: #e2e8f0; border-color: #475569; }
+      [data-theme="dark"] .badge-neutral { background: #334155; color: #94a3b8; }
+      [data-theme="dark"] .close-btn { background: #334155; color: #94a3b8; } [data-theme="dark"] .close-btn:hover { background: #475569; }
+      [data-theme="dark"] .stat-card { background: #1e293b; border-color: #334155; }
+      [data-theme="dark"] .row-green td { background: #064e3b !important; }
+      [data-theme="dark"] .row-yellow td { background: #451a03 !important; }
+      [data-theme="dark"] .row-red td { background: #450a0a !important; }
+      [data-theme="dark"] .filter-card { background: #1e293b !important; border-color: #334155 !important; }
+      [data-theme="dark"] .operator-card { background: #1e293b; border-color: #334155; }
+      [data-theme="dark"] .shop-item { background: #334155; color: #e2e8f0; }
+      [data-theme="dark"] .shop-item:hover { background: #475569; }
+
+      * { transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease; }
+      html { scroll-behavior: smooth; }
+
+      body { font-family: 'Inter', sans-serif; background-color: var(--bg-main); color: var(--text-main); margin: 0; padding: 0; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+      
+      .app-header { background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); padding: 20px 20px 18px; text-align: center; position: relative; border-bottom: 3px solid #ef4444; z-index: 1001; }
+      .app-header h1 { margin: 0; font-size: 26px; font-weight: 900; letter-spacing: 1.5px;
+        background: linear-gradient(135deg, #dc2626 0%, #ef4444 50%, #f87171 100%);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1.2;
+      }
+      .app-header .subtitle { margin: 6px 0 0; color: #475569; font-size: 13px; font-weight: 500;
+        letter-spacing: 0.3px; display: flex; align-items: center; justify-content: center; gap: 6px;
+      }
+      .subtitle-dot { width: 5px; height: 5px; background: #ef4444; border-radius: 50%; display: inline-block; }
+      .theme-toggle { position: absolute; top: 14px; right: 16px; background: var(--bg-card); border: 1px solid var(--border-light);
+        border-radius: 50%; width: 36px; height: 36px; cursor: pointer; font-size: 16px;
+        display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); z-index: 10;
+      }
+      .theme-toggle:hover { transform: scale(1.1); }
+
+      .tabs-sticky-wrapper { position: sticky; top: 0; z-index: 1000; background: var(--bg-main); padding: 10px 20px 8px; margin-top: -8px; }
+      .tabs { display: flex; background: var(--bg-card); padding: 6px; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+        gap: 4px; overflow-x: auto; white-space: nowrap; border: 1px solid rgba(255,255,255,0.8); max-width: 1050px; margin: 0 auto;
+      }
+      .tab { padding: 10px 18px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--text-muted);
+        border-radius: 14px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; align-items: center; gap: 6px; position: relative;
+      }
+      .tab.active { background: var(--primary); color: white; box-shadow: 0 8px 20px -6px rgba(220, 38, 38, 0.5); }
+      .tab:hover:not(.active) { background: var(--bg-main); color: var(--text-main); }
+      .tab kbd { background: rgba(255,255,255,0.2); padding: 2px 5px; border-radius: 4px; font-size: 9px; font-weight: 700; margin-left: 2px; }
+      .tab.active kbd { background: rgba(255,255,255,0.3); }
+
+      .main-content { padding: 16px 30px 30px; max-width: 100%; margin: 0 auto; box-sizing: border-box; }
+      .view-container { display: none; animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+      .view-container.active { display: block; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+      .filter-card { background: var(--bg-card); border-radius: var(--radius-lg); padding: 20px 24px; box-shadow: var(--shadow-md); margin-bottom: 16px; border: 1px solid var(--border-light); }
+      .quick-dates { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+      .quick-dates .divider { width: 1px; height: 20px; background: var(--border-light); margin: 0 2px; }
+      .controls { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+      .control-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 160px; }
+      .control-group label { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.6px; }
+      
+      input, select, textarea { width: 100%; box-sizing: border-box; padding: 10px 14px; border: 1px solid var(--border-light);
+        border-radius: var(--radius-sm); font-family: inherit; font-size: 14px; font-weight: 500;
+        color: var(--text-main); background: var(--bg-card); box-shadow: var(--shadow-sm);
+      }
+      input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1), var(--shadow-sm); }
+      
+      .btn { padding: 10px 20px; color: white; border: none; border-radius: var(--radius-sm); cursor: pointer; font-weight: 700; font-size: 14px;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      }
+      .btn-primary { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); box-shadow: 0 6px 16px -4px rgba(220, 38, 38, 0.4); }
+      .btn-primary:hover { box-shadow: 0 10px 20px -4px rgba(220, 38, 38, 0.5); transform: translateY(-1px); }
+      .btn:disabled { background: #cbd5e1; box-shadow: none; transform: none; cursor: not-allowed; }
+      .btn:active { transform: scale(0.97); }
+      .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 20px; background: var(--bg-main); color: var(--text-main);
+        border: 1px solid var(--border-light); cursor: pointer; font-weight: 600; transition: all 0.2s; white-space: nowrap;
+      }
+      .btn-sm:hover { background: var(--border-light); }
+      .btn-sm.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+      .results-card { background: var(--bg-card); border-radius: var(--radius-lg); padding: 0; box-shadow: var(--shadow-md); border: 1px solid var(--border-light); overflow: hidden; }
+      .table-responsive { overflow-x: auto; width: 100%; max-height: 55vh; overflow-y: auto; }
+      table { width: 100%; border-collapse: collapse; min-width: 900px; background: var(--bg-card); }
+      thead { position: sticky; top: 0; z-index: 10; }
+      th { background: #f8fafc; padding: 14px 14px; text-align: left; font-size: var(--font-header); font-weight: 700;
+        color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.6px; border-bottom: 2px solid var(--border-light);
+        white-space: nowrap; position: sticky; top: 0; cursor: pointer; user-select: none;
+      }
+      [data-theme="dark"] th { background: #334155; }
+      th:hover { background: #e2e8f0; } [data-theme="dark"] th:hover { background: #475569; }
+      th .sort-icon { margin-left: 3px; font-size: 10px; opacity: 0.4; }
+      th.sorted .sort-icon { opacity: 1; }
+      td { padding: 14px 14px; border-bottom: 1px solid var(--border-light); font-size: var(--font-table); vertical-align: middle; color: #334155; line-height: 1.5; }
+      tbody tr { transition: background 0.15s; }
+      tbody tr:hover { background: #f8fafc; }
+      .name-text { font-size: var(--font-name) !important; font-weight: 700 !important; color: var(--text-main); }
+      tr.row-super-critical td { background: rgba(254, 226, 226, 0.4); }
+      tr.row-super-critical td:first-child { box-shadow: inset 3px 0 0 #ef4444; }
+      tr.row-critical td { background: rgba(254, 242, 242, 0.5); }
+      tr.row-critical td:first-child { box-shadow: inset 3px 0 0 #f87171; }
+      
+      tr.row-green td { background: #f0fdf4; color: #166534; }
+      tr.row-yellow td { background: #fffbeb; color: #92400e; }
+      tr.row-red td { background: #fef2f2; color: #991b1b; }
+
+      .badge { padding: 5px 12px; border-radius: 20px; font-size: var(--font-badge); font-weight: 700; display: inline-block; white-space: nowrap; }
+      .badge-neutral { background: #f1f5f9; color: #475569; }
+      .badge-danger { background: var(--danger-bg); color: var(--danger-text); }
+      .badge-warning { background: var(--warning-bg); color: var(--warning-text); }
+      .badge-success { background: var(--success-bg); color: var(--success-text); }
+      .badge-info { background: var(--info-bg); color: var(--info-text); cursor: pointer; }
+      .badge-critical-dark { background: #7f1d1d; color: white; }
+      .badge-warning-dark { background: #fef08a; color: #713f12; }
+      .link { color: var(--secondary); cursor: pointer; text-decoration: none; transition: color 0.2s; }
+      .link:hover { color: #1d4ed8; text-decoration: underline; }
+      .muted-text { color: var(--text-muted); font-size: var(--font-badge); margin-top: 3px; display: block; line-height: 1.5; }
+
+      .modal-overlay { display: none; position: fixed; z-index: 2000; inset: 0; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(12px); padding: 20px; overflow-y: auto; }
+      .modal-content { background: var(--bg-card); margin: 40px auto; padding: 40px; border-radius: var(--radius-2xl); width: 100%; max-width: 1000px; box-shadow: var(--shadow-xl); position: relative; animation: modalSlide 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+      @keyframes modalSlide { from { opacity: 0; transform: translateY(30px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+      .close-btn { position: absolute; top: 20px; right: 20px; background: #f1f5f9; color: #64748b; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+      .close-btn:hover { background: #e2e8f0; color: #0f172a; transform: rotate(90deg); }
+
+      .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; margin: 25px 0; }
+      .stat-card { background: var(--bg-card); padding: 20px; border-radius: var(--radius-md); text-align: center; border: 1px solid var(--border-light); box-shadow: var(--shadow-sm); transition: transform 0.2s; }
+      .stat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+      .stat-title { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.3px; }
+      .stat-value { font-size: 28px; font-weight: 900; color: var(--text-main); }
+      .stat-value.danger { color: #ef4444; } .stat-value.success { color: #10b981; }
+
+      .loader-container { position: fixed; inset: 0; background: rgba(241,245,249,0.8); backdrop-filter: blur(8px); z-index: 3000; display: none; flex-direction: column; align-items: center; justify-content: center; }
+      .spinner { width: 44px; height: 44px; border: 4px solid #e2e8f0; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      .toast-container { position: fixed; bottom: 16px; right: 16px; z-index: 4000; display: flex; flex-direction: column; gap: 8px; }
+      .toast { padding: 12px 20px; border-radius: var(--radius-sm); color: white; font-weight: 600; font-size: 13px; box-shadow: var(--shadow-xl); animation: slideIn 0.3s ease; display: flex; align-items: center; gap: 8px; max-width: 380px; }
+      .toast.success { background: #10b981; } .toast.error { background: #ef4444; } .toast.info { background: #3b82f6; }
+      @keyframes slideIn { from { opacity: 0; transform: translateX(80px); } to { opacity: 1; transform: translateX(0); } }
+      @keyframes slideOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(80px); } }
+      .export-menu { position: relative; display: inline-block; }
+      .export-dropdown { position: absolute; top: 100%; right: 0; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--radius-sm); box-shadow: var(--shadow-xl); z-index: 100; min-width: 150px; display: none; overflow: hidden; margin-top: 4px; }
+      .export-dropdown.show { display: block; }
+      .export-item { padding: 10px 14px; cursor: pointer; font-size: 13px; font-weight: 500; transition: background 0.15s; display: flex; align-items: center; gap: 6px; }
+      .export-item:hover { background: var(--bg-main); }
+      .tooltip { position: relative; }
+      .tooltip::after { content: attr(data-tip); position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%); background: #0f172a; color: white; padding: 5px 10px; border-radius: 6px; font-size: 11px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+      .tooltip:hover::after { opacity: 1; }
+
+      @media (max-width: 768px) {
+        .tabs { padding: 4px; } .tab { padding: 8px 14px; font-size: 13px; }
+        .app-header { padding: 16px 15px 14px; } .app-header h1 { font-size: 20px; } .app-header .subtitle { font-size: 11px; }
+        .main-content { padding: 12px 15px; } .filter-card { padding: 14px 16px; }
+        .controls { flex-direction: column; align-items: stretch; gap: 10px; } .control-group { min-width: 100%; } .btn { width: 100%; }
+        .modal-content { padding: 20px; margin: 15px; }
+        .theme-toggle { top: 8px; right: 8px; width: 30px; height: 30px; font-size: 14px; }
+      }
+    </style>
+  </head>
+
+  <body>
+    <header class="app-header">
+      <button class="theme-toggle tooltip" data-tip="Змінити тему" onclick="toggleTheme()" id="themeToggle">🌙</button>
+      <h1>Система аналітики та контролю ефективності</h1>
+      <div class="subtitle"><span class="subtitle-dot"></span>Моніторинг порушень та KPI операторів (Supabase)<span class="subtitle-dot"></span></div>
+    </header>
+
+    <div class="tabs-sticky-wrapper">
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('sellers', this)">👥 Звіт продавців</div>
+        <div class="tab" onclick="switchTab('operators', this)">📈 Ефективність</div>
+        <div class="tab" onclick="switchTab('log', this)">📑 Журнал</div>
+        <div class="tab" onclick="switchTab('add', this)">✍️ Фіксація</div>
+        <div class="tab" onclick="switchTab('help', this)">💡 Довідка</div>
+      </div>
+    </div>
+
+    <div id="loading" class="loader-container"><div class="spinner"></div><h3 style="color: var(--text-main); margin-top: 16px; font-weight: 700;">Аналізуємо дані...</h3></div>
+    <div class="toast-container" id="toastContainer"></div>
+
+    <div class="main-content">
+      
+      <div id="view-sellers" class="view-container active">
+        <div class="filter-card">
+          <div class="quick-dates" id="sellerQuickDates">
+            <button class="btn-sm active" onclick="setQuickDate('today', 'seller')">📅 Сьогодні</button>
+            <button class="btn-sm" onclick="setQuickDate('yesterday', 'seller')">📅 Вчора</button>
+            <button class="btn-sm" onclick="setQuickDate('week', 'seller')">📅 7 днів</button>
+            <button class="btn-sm" onclick="setQuickDate('month', 'seller')">📅 Минулий місяць</button>
+            <button class="btn-sm" onclick="setQuickDate('year_start', 'seller')">📅 Початок року</button>
+            <span class="divider"></span>
+            <div class="export-menu"><button class="btn-sm" onclick="toggleExport('sellerExport')">📥 Експорт ▾</button><div class="export-dropdown" id="sellerExport"><div class="export-item" onclick="exportTable('sellers', 'csv'); toggleExport('sellerExport')">📄 CSV</div><div class="export-item" onclick="exportTable('sellers', 'excel'); toggleExport('sellerExport')">📊 Excel</div><div class="export-item" onclick="copyTable('sellers'); toggleExport('sellerExport')">📋 Копіювати</div></div></div>
+          </div>
+          <div class="controls">
+            <div class="control-group"><label>Початкова дата</label><input type="date" id="sellerStartDate" onchange="renderSellersTable()"></div>
+            <div class="control-group"><label>Кінцева дата</label><input type="date" id="sellerEndDate" onchange="renderSellersTable()"></div>
+            <div class="control-group"><label>Фільтр</label><select id="sellerFilter" onchange="renderSellersTable()"><option value="all">Усі порушення</option><option value="critical">🔴 Тільки критичні</option><option value="superCritical">☠️ Тільки надкритичні</option><option value="showcase">🧊 Вітрини</option><option value="noShowcase">✅ Без вітрин</option></select></div>
+            <div class="control-group" style="flex:2;"><label>Пошук (ПІБ, магазин)</label><input type="text" id="sellerSearch" placeholder="Введіть ПІБ або магазин..." oninput="renderSellersTable()"></div>
+            <div class="control-group" style="flex:1.5;"><label>Пошук по категорії</label><input type="text" id="sellerCategorySearch" placeholder="Назва категорії..." oninput="renderSellersTable()"></div>
+            <button class="btn btn-primary" onclick="loadSellers()">🔍 Знайти</button>
+          </div>
+        </div>
+        <div class="results-card" id="sellersCard" style="display:none;"><div class="table-responsive"><table id="sellersTable"><thead><tr><th>№</th><th onclick="sortTable('sellers',1)">Продавець</th><th onclick="sortTable('sellers',2)">Магазин</th><th>Період</th><th onclick="sortTable('sellers',4)">Всього</th><th onclick="sortTable('sellers',5)">Критичні</th><th>Ризик</th><th>Деталі</th></tr></thead><tbody id="sellersBody"></tbody></table></div></div>
+      </div>
+
+      <div id="view-operators" class="view-container">
+        <div class="filter-card">
+          <div class="quick-dates" id="operatorsQuickDates">
+            <button class="btn-sm active" onclick="setQuickDate('today', 'operators')">📅 Сьогодні</button>
+            <button class="btn-sm" onclick="setQuickDate('yesterday', 'operators')">📅 Вчора</button>
+            <button class="btn-sm" onclick="setQuickDate('week', 'operators')">📅 7 днів</button>
+            <button class="btn-sm" onclick="setQuickDate('month', 'operators')">📅 Минулий місяць</button>
+            <button class="btn-sm" onclick="setQuickDate('year_start', 'operators')">📅 Початок року</button>
+          </div>
+          <div class="controls">
+            <div class="control-group"><label>Початкова дата</label><input type="date" id="startDate"></div>
+            <div class="control-group"><label>Кінцева дата</label><input type="date" id="endDate"></div>
+            <button class="btn btn-primary" onclick="loadOperators()">📊 Розрахувати KPI</button>
+          </div>
+        </div>
+        <div class="results-card" id="operatorsCard" style="display:none;"><div class="table-responsive"><table id="operatorsTable"><thead><tr><th>№</th><th>Оператор</th><th>Бали</th><th>Порушень</th></tr></thead><tbody id="operatorsBody"></tbody></table></div></div>
+      </div>
+
+      <div id="view-log" class="view-container">
+        <div class="filter-card">
+          <div class="quick-dates" id="logQuickDates">
+            <button class="btn-sm active" onclick="setQuickDate('today', 'log')">📅 Сьогодні</button>
+            <button class="btn-sm" onclick="setQuickDate('yesterday', 'log')">📅 Вчора</button>
+            <button class="btn-sm" onclick="setQuickDate('week', 'log')">📅 7 днів</button>
+            <button class="btn-sm" onclick="setQuickDate('month', 'log')">📅 Минулий місяць</button>
+            <button class="btn-sm" onclick="setQuickDate('year_start', 'log')">📅 Початок року</button>
+            <span class="divider"></span>
+            <div class="export-menu"><button class="btn-sm" onclick="toggleExport('logExport')">📥 Експорт ▾</button><div class="export-dropdown" id="logExport"><div class="export-item" onclick="exportTable('log', 'csv'); toggleExport('logExport')">📄 CSV</div><div class="export-item" onclick="exportTable('log', 'excel'); toggleExport('logExport')">📊 Excel</div><div class="export-item" onclick="copyTable('log'); toggleExport('logExport')">📋 Копіювати</div></div></div>
+          </div>
+          <div class="controls">
+            <div class="control-group"><label>Початкова дата</label><input type="date" id="logStartDate"></div>
+            <div class="control-group"><label>Кінцева дата</label><input type="date" id="logEndDate"></div>
+            <div class="control-group" style="flex:2;"><label>Пошук (ПІБ, магазин)</label><input type="text" id="logSearch" placeholder="Кого шукаємо?..." oninput="renderLogTable()"></div>
+            <div class="control-group" style="flex:1.5;"><label>Пошук по категорії</label><input type="text" id="logCategorySearch" placeholder="Назва категорії..." oninput="renderLogTable()"></div>
+            <button class="btn btn-primary" onclick="loadLog()">📖 Відкрити журнал</button>
+          </div>
+        </div>
+        <div class="results-card" id="logCard" style="display:none;"><div class="table-responsive"><table id="logTable"><thead><tr><th>№</th><th>Дата події</th><th>Магазин</th><th>Адміністратор</th><th>Оператор</th><th>Продавець</th><th>Категорія</th><th>Опис</th></tr></thead><tbody id="logBody"></tbody></table></div></div>
+      </div>
+
+      <div id="view-add" class="view-container">
+        <div class="filter-card" style="max-width: 650px; margin: 0 auto; padding: 30px;">
+          <h2>Реєстрація порушення</h2>
+          <form id="violationForm" onsubmit="submitViolationForm(event)">
+            <div class="control-group"><label>Магазин</label><input id="f_shop" required></div>
+            <div class="control-group"><label>Адміністратор</label><input id="f_admin"></div>
+            <div class="control-group"><label>Оператор</label><select id="f_op" required><option value="">-- Оберіть --</option></select></div>
+            <div class="control-group"><label>Продавець</label><input id="f_sell" required></div>
+            <div style="display: flex; gap: 12px;">
+              <div class="control-group"><label>Дата</label><input type="date" id="f_date" required></div>
+              <div class="control-group"><label>Час</label><input type="time" id="f_time"></div>
+            </div>
+            <div class="control-group"><label>Категорія</label><select id="f_cat" required><option value="">-- Оберіть --</option></select></div>
+            <div class="control-group"><label>Опис</label><textarea id="f_desc" rows="3" required></textarea></div>
+            <button type="submit" class="btn btn-primary" style="margin-top: 15px; width: 100%;">💾 Зберегти</button>
+            <div id="fStat" style="text-align:center; margin-top:8px;"></div>
+          </form>
+        </div>
+      </div>
+
+      <div id="view-help" class="view-container">
+        <div class="filter-card">
+          <h3>Вага порушень</h3>
+          <table>
+            <tr><th>Група</th><th>Бали</th><th>Типи</th></tr>
+            <tr><td><span class="badge badge-danger">Надкритичні</span></td><td>20</td><td>Камери, спиртне</td></tr>
+            <tr><td><span class="badge badge-danger">Критичні</span></td><td>10</td><td>Махінації</td></tr>
+            <tr><td><span class="badge badge-warning">Операційні</span></td><td>5</td><td>Пересорт, обрахунок...</td></tr>
+            <tr><td><span class="badge badge-neutral">Дрібні</span></td><td>1</td><td>Рукавички, телефон...</td></tr>
+            <tr><td><span class="badge badge-success">Бонусні</span></td><td>10/5</td><td>Службове завдання, турбота</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="sellerModal" class="modal-overlay"><div class="modal-content"><span class="close-btn" onclick="closeModal('sellerModal')">✕</span><div id="modalSellerBody"></div></div></div>
+    <div id="operatorModal" class="modal-overlay"><div class="modal-content"><span class="close-btn" onclick="closeModal('operatorModal')">✕</span><div id="modalOpBody"></div></div></div>
+
+    <script>
+      // ================== ИНИЦИАЛИЗАЦИЯ SUPABASE ==================
+      const supabase = window.supabase.createClient(
+        'https://bnipewkczbqcravhptkn.supabase.com',
+        'sb_publishable_HAnGqHn_9wM_1T78evD-AQ_JRGeLBLo'
+      );
+
+      // ================== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==================
+      let sellersData = [], operatorsData = [], logData = [];
+
+      // ================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==================
+      function showToast(m, t) {
+        t = t || 'info';
+        const c = document.getElementById('toastContainer');
+        const to = document.createElement('div');
+        to.className = 'toast ' + t;
+        to.textContent = m;
+        c.appendChild(to);
+        setTimeout(() => { to.style.animation = 'slideOut 0.3s ease forwards'; setTimeout(() => to.remove(), 300); }, 3000);
+      }
+
+      function toggleTheme() {
+        const h = document.documentElement;
+        const newTheme = h.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        h.setAttribute('data-theme', newTheme);
+        document.getElementById('themeToggle').innerHTML = newTheme === 'dark' ? '☀️' : '🌙';
+        localStorage.setItem('meatnyk_theme', newTheme);
+      }
+
+      function esc(v) { return String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'); }
+
+      function classifyViolation(cat, desc) {
+        const text = ((cat || '') + ' ' + (desc || '')).toLowerCase();
+        if (text.includes('камер') || text.includes('спиртн') || text.includes('надкритич')) return { pts: 20, isCrit: true, isSuper: true };
+        if (text.includes('службов') || text.includes('бонус')) return { pts: 10, isCrit: false, isSuper: false };
+        if (text.includes('турбот')) return { pts: 5, isCrit: false, isSuper: false };
+        if (text.includes('рукавич') || text.includes('пустот') || text.includes('телефон') || text.includes('зовнішн') || text.includes('обслуговуван')) return { pts: 1, isCrit: false, isSuper: false };
+        if (text.includes('видален') || text.includes('виніс') || text.includes('привласнен') || text.includes('махінац') || text.includes('повз касу') || text.includes('протермінован') || text.includes('маніпуляці')) return { pts: 10, isCrit: true, isSuper: false };
+        if (text.includes('пересорт') || text.includes('обрахунок') || text.includes('касов') || text.includes('сейф') || text.includes('санітар') || text.includes('переоцін') || text.includes('відкриття') || text.includes('закриття') || text.includes('збільшен') || text.includes('ваг')) return { pts: 5, isCrit: false, isSuper: false };
+        if (text.includes('графік') || text.includes('куріння') || text.includes('лексик') || text.includes('раннє')) return { pts: 3, isCrit: false, isSuper: false };
+        return { pts: 1, isCrit: false, isSuper: false };
+      }
+
+      // ================== ЗАГРУЗКА ДАННЫХ ==================
+      async function loadSellers() {
+        document.getElementById('loading').style.display = 'flex';
+        const start = document.getElementById('sellerStartDate').value;
+        const end = document.getElementById('sellerEndDate').value;
+        let query = supabase.from('violations').select('*').order('"Дата"', { ascending: false });
+        if (start) query = query.gte('"Дата"', start);
+        if (end) query = query.lte('"Дата"', end);
+        const { data, error } = await query;
+        document.getElementById('loading').style.display = 'none';
+        if (error) return showToast(error.message, 'error');
+        sellersData = aggregateSellers(data);
+        renderSellersTable();
+        showToast('✅ Знайдено ' + sellersData.length + ' продавців', 'success');
+      }
+
+      function aggregateSellers(rows) {
+        const sellers = {};
+        rows.forEach(v => {
+          const seller = (v["Продавец ФІО"] || '').trim().toUpperCase();
+          if (!seller) return;
+          const cls = classifyViolation(v["Категорія"], v["Порушення"]);
+          if (!sellers[seller]) sellers[seller] = { name: seller, count: 0, crit: 0, superCrit: 0, shops: {}, types: [] };
+          sellers[seller].count++;
+          if (cls.isCrit) sellers[seller].crit++;
+          if (cls.isSuper) sellers[seller].superCrit++;
+          sellers[seller].shops[v["Магазин"]] = true;
+          sellers[seller].types.push(v["Категорія"]);
+        });
+        return Object.values(sellers).map(r => ({
+          name: r.name,
+          shops: Object.keys(r.shops).join(', '),
+          count: r.count,
+          criticalCount: r.crit,
+          hasCritical: r.crit > 0,
+          hasSuperCritical: r.superCrit > 0,
+          types: r.types.join(', '),
+          risk: r.superCrit > 0 ? 'Високий' : (r.crit > 0 ? 'Середній' : 'Низький')
+        })).sort((a,b) => b.superCrit - a.superCrit || b.crit - a.crit);
+      }
+
+      function renderSellersTable() {
+        const tb = document.getElementById('sellersBody');
+        if (!sellersData.length) {
+          tb.innerHTML = '<tr><td colspan="8">Немає даних</td></tr>';
+          document.getElementById('sellersCard').style.display = 'block';
+          return;
+        }
+        let html = '';
+        sellersData.forEach((r, i) => {
+          html += `<tr>
+            <td>${i+1}</td>
+            <td>${esc(r.name)}</td>
+            <td>${esc(r.shops)}</td>
+            <td>--</td>
+            <td>${r.count}</td>
+            <td><span class="badge ${r.criticalCount ? 'badge-danger' : 'badge-neutral'}">${r.criticalCount}</span></td>
+            <td><span class="badge ${r.risk === 'Високий' ? 'badge-danger' : (r.risk === 'Середній' ? 'badge-warning' : 'badge-success')}">${r.risk}</span></td>
+            <td>${esc(r.types.substring(0,50))}</td>
+          </tr>`;
+        });
+        tb.innerHTML = html;
+        document.getElementById('sellersCard').style.display = 'block';
+      }
+
+      async function loadOperators() {
+        document.getElementById('loading').style.display = 'flex';
+        const start = document.getElementById('startDate').value;
+        const end = document.getElementById('endDate').value;
+        let query = supabase.from('violations').select('*');
+        if (start) query = query.gte('"Дата"', start);
+        if (end) query = query.lte('"Дата"', end);
+        const { data, error } = await query;
+        document.getElementById('loading').style.display = 'none';
+        if (error) return showToast(error.message, 'error');
+        const ops = {};
+        data.forEach(v => {
+          const op = (v["Оператор"] || '').trim();
+          if (!op) return;
+          const cls = classifyViolation(v["Категорія"], v["Порушення"]);
+          if (!ops[op]) ops[op] = { name: op, sum: 0, count: 0 };
+          ops[op].sum += cls.pts;
+          ops[op].count++;
+        });
+        operatorsData = Object.values(ops).sort((a,b) => b.sum - a.sum);
+        let html = '';
+        operatorsData.forEach((r, i) => {
+          html += `<tr><td>${i+1}</td><td>${r.name}</td><td>${r.sum}</td><td>${r.count}</td></tr>`;
+        });
+        document.getElementById('operatorsBody').innerHTML = html;
+        document.getElementById('operatorsCard').style.display = 'block';
+        showToast('KPI розраховано', 'success');
+      }
+
+      async function loadLog() {
+        document.getElementById('loading').style.display = 'flex';
+        const start = document.getElementById('logStartDate').value;
+        const end = document.getElementById('logEndDate').value;
+        let query = supabase.from('violations').select('*').order('"Дата"', { ascending: false });
+        if (start) query = query.gte('"Дата"', start);
+        if (end) query = query.lte('"Дата"', end);
+        const { data, error } = await query;
+        document.getElementById('loading').style.display = 'none';
+        if (error) return showToast(error.message, 'error');
+        logData = data;
+        renderLogTable();
+        showToast('Журнал завантажено', 'success');
+      }
+
+      function renderLogTable() {
+        const tb = document.getElementById('logBody');
+        if (!logData.length) {
+          tb.innerHTML = '<tr><td colspan="8">Немає записів</td></tr>';
+          document.getElementById('logCard').style.display = 'block';
+          return;
+        }
+        let html = '';
+        logData.forEach((v, i) => {
+          html += `<tr>
+            <td>${i+1}</td>
+            <td>${v["Дата"] || ''}</td>
+            <td>${v["Магазин"] || ''}</td>
+            <td>${v["Адмін ФИО"] || ''}</td>
+            <td>${v["Оператор"] || ''}</td>
+            <td>${v["Продавец ФІО"] || ''}</td>
+            <td>${v["Категорія"] || ''}</td>
+            <td>${(v["Порушення"] || '').substring(0, 80)}</td>
+          </tr>`;
+        });
+        tb.innerHTML = html;
+        document.getElementById('logCard').style.display = 'block';
+      }
+
+      async function submitViolationForm(e) {
+        e.preventDefault();
+        const btn = e.target.querySelector('button');
+        btn.disabled = true;
+        btn.textContent = 'Збереження...';
+        const { error } = await supabase.from('violations').insert([{
+          "Магазин": document.getElementById('f_shop').value,
+          "Адмін ФИО": document.getElementById('f_admin').value,
+          "Оператор": document.getElementById('f_op').value,
+          "Продавец ФІО": document.getElementById('f_sell').value,
+          "Дата": document.getElementById('f_date').value,
+          "Час": document.getElementById('f_time').value || null,
+          "Категорія": document.getElementById('f_cat').value,
+          "Порушення": document.getElementById('f_desc').value
+        }]);
+        btn.disabled = false;
+        btn.textContent = '💾 Зберегти';
+        if (error) {
+          showToast(error.message, 'error');
+        } else {
+          showToast('✅ Порушення зафіксовано!', 'success');
+          document.getElementById('violationForm').reset();
+        }
+      }
+
+      // ================== СМЕНА ВКЛАДОК ==================
+      function switchTab(name, el) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.view-container').forEach(v => v.classList.remove('active'));
+        el.classList.add('active');
+        document.getElementById('view-' + name).classList.add('active');
+        if (name === 'sellers') loadSellers();
+        else if (name === 'operators') loadOperators();
+        else if (name === 'log') loadLog();
+      }
+
+      // ================== БЫСТРЫЕ ДАТЫ (упрощённо) ==================
+      function setQuickDate(p, tab) {
+        const d = new Date();
+        let s, e;
+        if (p === 'today') s = e = d.toISOString().split('T')[0];
+        else if (p === 'yesterday') { d.setDate(d.getDate()-1); s = e = d.toISOString().split('T')[0]; }
+        else if (p === 'week') { e = d.toISOString().split('T')[0]; d.setDate(d.getDate()-7); s = d.toISOString().split('T')[0]; }
+        else if (p === 'month') { const fd = new Date(d.getFullYear(), d.getMonth(), 1); const ld = new Date(fd.getTime()-1); s = new Date(ld.getFullYear(), ld.getMonth(), 1).toISOString().split('T')[0]; e = ld.toISOString().split('T')[0]; }
+        else if (p === 'year_start') { s = `${d.getFullYear()}-01-01`; e = d.toISOString().split('T')[0]; }
+        if (tab === 'seller') { document.getElementById('sellerStartDate').value = s; document.getElementById('sellerEndDate').value = e; }
+        else if (tab === 'operators') { document.getElementById('startDate').value = s; document.getElementById('endDate').value = e; }
+        else if (tab === 'log') { document.getElementById('logStartDate').value = s; document.getElementById('logEndDate').value = e; }
+        // Обновляем активную кнопку
+        const container = document.getElementById(tab + 'QuickDates');
+        if (container) {
+          container.querySelectorAll('.btn-sm').forEach(b => b.classList.remove('active'));
+          const idx = ['today','yesterday','week','month','year_start'].indexOf(p);
+          if (idx >= 0) container.querySelectorAll('.btn-sm')[idx].classList.add('active');
+        }
+      }
+
+      function toggleExport(id) {
+        const el = document.getElementById(id);
+        el.classList.toggle('show');
+      }
+
+      // ================== ИНИЦИАЛИЗАЦИЯ ==================
+      window.onload = () => {
+        loadTheme();
+        const now = new Date().toISOString().split('T')[0];
+        document.getElementById('sellerStartDate').value = now;
+        document.getElementById('sellerEndDate').value = now;
+        document.getElementById('startDate').value = now;
+        document.getElementById('endDate').value = now;
+        document.getElementById('logStartDate').value = now;
+        document.getElementById('logEndDate').value = now;
+        document.getElementById('f_date').value = now;
+        loadSellers();
+      };
+
+      function loadTheme() {
+        if (localStorage.getItem('meatnyk_theme') === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+          document.getElementById('themeToggle').innerHTML = '☀️';
+        }
+      }
+    </script>
+  </body>
 </html>
