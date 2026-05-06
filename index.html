@@ -1,2 +1,254 @@
-const SUPABASE_URL = 'https://bnipewkczbqcravhptkn.supabase.com';
-const SUPABASE_ANON_KEY = 'sb_publishable_HAnGqHn_9wM_1T78evD-AQ_JRGeLBLo';
+<!DOCTYPE html>
+<html lang="uk" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>М'ЯСНИК – Аналітика (Supabase)</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    /* Стилі – скорочено, але вони забезпечують повний дизайн */
+    :root {
+      --primary: #dc2626; --primary-hover: #b91c1c; --secondary: #3b82f6;
+      --bg-main: #f1f5f9; --bg-card: #ffffff; --text-main: #0f172a; --text-muted: #64748b; --border-light: #e2e8f0;
+      --danger-bg: #fee2e2; --danger-text: #991b1b; --warning-bg: #fef3c7; --warning-text: #92400e;
+      --success-bg: #dcfce7; --success-text: #166534; --info-bg: #e0f2fe; --info-text: #075985;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.05); --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+      --radius-sm: 12px; --radius-md: 16px; --radius-lg: 20px; --radius-xl: 24px;
+    }
+    [data-theme="dark"] {
+      --bg-main: #0f172a; --bg-card: #1e293b; --text-main: #f1f5f9; --text-muted: #94a3b8; --border-light: #334155;
+    }
+    * { transition: background-color 0.3s, color 0.3s; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg-main); color: var(--text-main); margin: 0; padding: 0; }
+    .app-header { background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); padding: 20px; text-align: center; border-bottom: 3px solid #ef4444; }
+    [data-theme="dark"] .app-header { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
+    .app-header h1 { font-size: 26px; font-weight: 900; background: linear-gradient(135deg, #dc2626, #f87171); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .tabs { display: flex; background: var(--bg-card); padding: 6px; border-radius: var(--radius-lg); max-width: 900px; margin: 20px auto; box-shadow: var(--shadow-md); }
+    .tab { padding: 10px 18px; font-weight: 600; color: var(--text-muted); border-radius: 14px; cursor: pointer; }
+    .tab.active { background: var(--primary); color: white; }
+    .view-container { display: none; padding: 20px; }
+    .view-container.active { display: block; }
+    .filter-card { background: var(--bg-card); padding: 20px; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); margin-bottom: 20px; }
+    .btn { padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: var(--radius-sm); cursor: pointer; font-weight: 700; }
+    .btn-sm { padding: 6px 12px; font-size: 12px; background: var(--bg-main); color: var(--text-main); border: 1px solid var(--border-light); border-radius: 20px; cursor: pointer; margin: 2px; }
+    .btn-sm.active { background: var(--primary); color: white; }
+    table { width: 100%; border-collapse: collapse; background: var(--bg-card); margin-top: 10px; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border-light); }
+    th { background: #f8fafc; font-weight: 700; color: var(--text-muted); }
+    .badge { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; display: inline-block; }
+    .badge-neutral { background: #f1f5f9; color: #475569; }
+    .badge-danger { background: #fee2e2; color: #991b1b; }
+    .badge-warning { background: #fef3c7; color: #92400e; }
+    .badge-success { background: #dcfce7; color: #166534; }
+    .toast-container { position: fixed; bottom: 16px; right: 16px; z-index: 4000; display: flex; flex-direction: column; gap: 8px; }
+    .toast { padding: 12px 20px; border-radius: var(--radius-sm); color: white; font-weight: 600; font-size: 13px; box-shadow: var(--shadow-md); }
+    .toast.success { background: #10b981; } .toast.error { background: #ef4444; } .toast.info { background: #3b82f6; }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <h1>Система аналітики та контролю ефективності</h1>
+    <div>Моніторинг порушень та KPI (Supabase)</div>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('sellers')">👥 Звіт продавців</div>
+    <div class="tab" onclick="switchTab('operators')">📈 Ефективність</div>
+    <div class="tab" onclick="switchTab('log')">📑 Журнал</div>
+    <div class="tab" onclick="switchTab('add')">✍️ Фіксація</div>
+    <div class="tab" onclick="switchTab('help')">💡 Довідка</div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Вкладки -->
+  <div id="view-sellers" class="view-container active">
+    <div class="filter-card">
+      <button class="btn" onclick="loadSellers()">Завантажити звіт</button>
+    </div>
+    <div id="sellersTable"></div>
+  </div>
+
+  <div id="view-operators" class="view-container">
+    <div class="filter-card"><button class="btn" onclick="loadOperators()">Розрахувати KPI</button></div>
+    <div id="operatorsTable"></div>
+  </div>
+
+  <div id="view-log" class="view-container">
+    <div class="filter-card"><button class="btn" onclick="loadLog()">Відкрити журнал</button></div>
+    <div id="logTable"></div>
+  </div>
+
+  <div id="view-add" class="view-container">
+    <div class="filter-card">
+      <h3>Реєстрація порушення</h3>
+      <form id="violationForm" onsubmit="submitViolation(event)">
+        <input type="text" id="shop" placeholder="Магазин" required><br><br>
+        <input type="text" id="admin" placeholder="Адміністратор"><br><br>
+        <input type="text" id="operator" placeholder="Оператор" required><br><br>
+        <input type="text" id="seller" placeholder="Продавець" required><br><br>
+        <input type="date" id="date" required><br><br>
+        <input type="time" id="time"><br><br>
+        <input type="text" id="category" placeholder="Категорія" required><br><br>
+        <textarea id="description" placeholder="Опис" required></textarea><br><br>
+        <button type="submit" class="btn">Зберегти</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="view-help" class="view-container">
+    <div class="filter-card">
+      <h3>Вага порушень</h3>
+      <table>
+        <tr><th>Група</th><th>Бали</th><th>Типи</th></tr>
+        <tr><td><span class="badge badge-danger">Надкритичні</span></td><td>20</td><td>Камери, спиртне</td></tr>
+        <tr><td><span class="badge badge-danger">Критичні</span></td><td>10</td><td>Махінації</td></tr>
+        <tr><td><span class="badge badge-warning">Операційні</span></td><td>5</td><td>Пересорт, обрахунок...</td></tr>
+        <tr><td><span class="badge badge-neutral">Дрібні</span></td><td>1</td><td>Рукавички, телефон...</td></tr>
+        <tr><td><span class="badge badge-success">Бонусні</span></td><td>10/5</td><td>Службове завдання, турбота</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // ========== Підключення Supabase ==========
+    const supabase = window.supabase.createClient(
+      'https://bnipewkczbqcravhptkn.supabase.com',
+      'sb_publishable_HAnGqHn_9wM_1T78evD-AQ_JRGeLBLo'
+    );
+
+    // ========== Допоміжні функції ==========
+    function showToast(msg, type = 'info') {
+      const c = document.getElementById('toastContainer');
+      const t = document.createElement('div');
+      t.className = `toast ${type}`;
+      t.textContent = msg;
+      c.appendChild(t);
+      setTimeout(() => t.remove(), 3000);
+    }
+
+    function switchTab(name) {
+      document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.view-container').forEach(v => v.classList.remove('active'));
+      document.querySelector(`.tab:nth-child(${['sellers','operators','log','add','help'].indexOf(name)+1})`).classList.add('active');
+      document.getElementById(`view-${name}`).classList.add('active');
+    }
+
+    // Класифікація порушення (за текстом категорії та опису)
+    function classifyViolation(cat, desc) {
+      const t = (cat + ' ' + (desc || '')).toLowerCase();
+      if (t.includes('камер') || t.includes('спиртн') || t.includes('надкритич')) return { pts: 20, isCrit: true, isSuper: true };
+      if (t.includes('службов') || t.includes('бонус')) return { pts: 10, isCrit: false, isSuper: false };
+      if (t.includes('турбот')) return { pts: 5, isCrit: false, isSuper: false };
+      if (t.includes('рукавич') || t.includes('пустот') || t.includes('телефон') || t.includes('зовнішн') || t.includes('обслуговуван')) return { pts: 1, isCrit: false, isSuper: false };
+      if (t.includes('видален') || t.includes('виніс') || t.includes('привласнен') || t.includes('махінац') || t.includes('повз касу') || t.includes('протермінован') || t.includes('маніпуляці')) return { pts: 10, isCrit: true, isSuper: false };
+      if (t.includes('пересорт') || t.includes('обрахунок') || t.includes('касов') || t.includes('сейф') || t.includes('санітар') || t.includes('переоцін') || t.includes('відкриття') || t.includes('закриття') || t.includes('збільшен') || t.includes('ваг')) return { pts: 5, isCrit: false, isSuper: false };
+      if (t.includes('графік') || t.includes('куріння') || t.includes('лексик') || t.includes('раннє')) return { pts: 3, isCrit: false, isSuper: false };
+      return { pts: 1, isCrit: false, isSuper: false };
+    }
+
+    // ========== Звіт продавців ==========
+    async function loadSellers() {
+      const { data, error } = await supabase.from('violations').select('*').order('Дата', { ascending: false });
+      if (error) return showToast(error.message, 'error');
+      const sellers = {};
+      data.forEach(v => {
+        const seller = (v["Продавец ФІО"] || '').trim().toUpperCase();
+        if (!seller) return;
+        const cls = classifyViolation(v["Категорія"], v["Порушення"]);
+        if (!sellers[seller]) sellers[seller] = { name: seller, count: 0, crit: 0, superCrit: 0, shops: {}, types: {} };
+        sellers[seller].count++;
+        if (cls.isCrit) sellers[seller].crit++;
+        if (cls.isSuper) sellers[seller].superCrit++;
+        sellers[seller].shops[v["Магазин"]] = true;
+        sellers[seller].types[v["Категорія"]] = (sellers[seller].types[v["Категорія"]] || 0) + 1;
+      });
+      const list = Object.values(sellers).sort((a,b) => b.superCrit - a.superCrit || b.crit - a.crit);
+      let html = '<table><tr><th>Продавець</th><th>Порушень</th><th>Критичні</th><th>Магазини</th></tr>';
+      list.forEach(r => {
+        html += `<tr>
+          <td>${r.name}</td>
+          <td>${r.count}</td>
+          <td><span class="badge ${r.crit ? 'badge-danger' : 'badge-neutral'}">${r.crit}</span></td>
+          <td>${Object.keys(r.shops).join(', ')}</td>
+        </tr>`;
+      });
+      html += '</table>';
+      document.getElementById('sellersTable').innerHTML = html;
+      showToast('Звіт завантажено', 'success');
+    }
+
+    // ========== KPI операторів ==========
+    async function loadOperators() {
+      const { data, error } = await supabase.from('violations').select('*');
+      if (error) return showToast(error.message, 'error');
+      const ops = {};
+      data.forEach(v => {
+        const op = (v["Оператор"] || '').trim();
+        if (!op) return;
+        const cls = classifyViolation(v["Категорія"], v["Порушення"]);
+        if (!ops[op]) ops[op] = { name: op, sum: 0, count: 0 };
+        ops[op].sum += cls.pts;
+        ops[op].count++;
+      });
+      const list = Object.values(ops).sort((a,b) => b.sum - a.sum);
+      let html = '<table><tr><th>Оператор</th><th>Бали</th><th>Порушень</th></tr>';
+      list.forEach(r => {
+        html += `<tr><td>${r.name}</td><td>${r.sum}</td><td>${r.count}</td></tr>`;
+      });
+      html += '</table>';
+      document.getElementById('operatorsTable').innerHTML = html;
+      showToast('KPI розраховано', 'success');
+    }
+
+    // ========== Журнал ==========
+    async function loadLog() {
+      const { data, error } = await supabase.from('violations').select('*').order('Дата', { ascending: false });
+      if (error) return showToast(error.message, 'error');
+      let html = '<table><tr><th>Дата</th><th>Магазин</th><th>Оператор</th><th>Продавець</th><th>Категорія</th><th>Опис</th></tr>';
+      data.forEach(v => {
+        html += `<tr>
+          <td>${v["Дата"] || ''}</td>
+          <td>${v["Магазин"] || ''}</td>
+          <td>${v["Оператор"] || ''}</td>
+          <td>${v["Продавец ФІО"] || ''}</td>
+          <td>${v["Категорія"] || ''}</td>
+          <td>${(v["Порушення"] || '').substring(0, 50)}</td>
+        </tr>`;
+      });
+      html += '</table>';
+      document.getElementById('logTable').innerHTML = html;
+      showToast('Журнал завантажено', 'success');
+    }
+
+    // ========== Фіксація порушення ==========
+    async function submitViolation(e) {
+      e.preventDefault();
+      const btn = e.target.querySelector('button');
+      btn.disabled = true;
+      btn.textContent = 'Збереження...';
+      const { error } = await supabase.from('violations').insert([{
+        "Магазин": document.getElementById('shop').value,
+        "Адмін ФИО": document.getElementById('admin').value,
+        "Оператор": document.getElementById('operator').value,
+        "Продавец ФІО": document.getElementById('seller').value,
+        "Дата": document.getElementById('date').value,
+        "Час": document.getElementById('time').value || null,
+        "Категорія": document.getElementById('category').value,
+        "Порушення": document.getElementById('description').value
+      }]);
+      btn.disabled = false;
+      btn.textContent = 'Зберегти';
+      if (error) {
+        showToast(error.message, 'error');
+      } else {
+        showToast('Порушення зафіксовано!', 'success');
+        document.getElementById('violationForm').reset();
+      }
+    }
+
+    // Встановлюємо сьогоднішню дату за замовчуванням у формі
+    document.getElementById('date').value = new Date().toISOString().split('T')[0];
+  </script>
+</body>
+</html>
